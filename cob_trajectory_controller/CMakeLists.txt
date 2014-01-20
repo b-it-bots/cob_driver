@@ -34,6 +34,7 @@ catkin_package(
 ###########
 
 include_directories(common/include ${catkin_INCLUDE_DIRS} ${orocos_kdl_INCLUDE_DIRS})
+link_directories(${orocos_kdl_LIBRARY_DIRS})
 
 
 add_executable(${PROJECT_NAME} ros/src/${PROJECT_NAME}.cpp common/src/genericArmCtrl.cpp common/src/RefValJS_PTP.cpp common/src/RefValJS_PTP_Trajectory.cpp common/src/TimeStamp.cpp)
