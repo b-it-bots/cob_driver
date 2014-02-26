@@ -24,7 +24,9 @@ INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/common/include)
 
 # add project libs
 add_library(${PROJECT_NAME} common/src/IniFile.cpp common/src/MathSup.cpp common/src/StrUtil.cpp common/src/TimeStamp.cpp)
-
+target_link_libraries(${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+)
 
 #############
 ## Install ##
