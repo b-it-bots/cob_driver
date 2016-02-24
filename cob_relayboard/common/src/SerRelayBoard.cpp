@@ -2,7 +2,7 @@
  *
  * Copyright (c) 2010
  *
- * Fraunhofer Institute for Manufacturing Engineering	
+ * Fraunhofer Institute for Manufacturing Engineering
  * and Automation (IPA)
  *
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -11,9 +11,9 @@
  * ROS stack name: cob_driver
  * ROS package name: cob_relayboard
  * Description: Class for communication with relayboard. The relayboard is mainly used for reading the Emergencystop and Laserscannerstop states.
- *								
+ *
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- *			
+ *
  * Author: Philipp Koehler
  * Supervised by: Christian Connette, email:christian.connette@ipa.fhg.de
  *
@@ -30,23 +30,23 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the Fraunhofer Institute for Manufacturing 
+ *     * Neither the name of the Fraunhofer Institute for Manufacturing
  *       Engineering and Automation (IPA) nor the names of its
  *       contributors may be used to endorse or promote products derived from
  *       this software without specific prior written permission.
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License LGPL as 
- * published by the Free Software Foundation, either version 3 of the 
+ * it under the terms of the GNU Lesser General Public License LGPL as
+ * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License LGPL for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public 
- * License LGPL along with this program. 
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License LGPL along with this program.
  * If not, see <http://www.gnu.org/licenses/>.
  *
  ****************************************************************/
@@ -54,11 +54,12 @@
 
 #include <math.h>
 #include <cob_relayboard/SerRelayBoard.h>
+#include <iostream>
 
 //-----------------------------------------------
 
 
-// #define NUM_BYTE_SEND 79 //Total amount of data sent to relayboard in one message, is now passed and set as protocol-version argument in constructor
+#define NUM_BYTE_SEND 79 //Total amount of data sent to relayboard in one message, is now passed and set as protocol-version argument in constructor
 
 #define RS422_BAUDRATE 420000
 #define RS422_RX_BUFFERSIZE 1024
@@ -71,6 +72,9 @@
 #define NUM_BYTE_REC_CHECKSUM 2 //checksum for message, that is built as the sum of all data bytes contained in the message
 #define NUM_BYTE_REC 104 //Total amount of data bytes in a received message (from the relayboard)
 
+#define NUM_BYTE_SEND_RELAYBOARD_14 88
+#define NUM_BYTE_REC_RELAYBOARD_14 124
+
 
 //-----------------------------------------------
 SerRelayBoard::SerRelayBoard(std::string ComPort, int ProtocolVersion)
@@ -79,10 +83,14 @@ SerRelayBoard::SerRelayBoard(std::string ComPort, int ProtocolVersion)
 	if(m_iProtocolVersion == 1)
 		m_NUM_BYTE_SEND = 50;
 	else if(m_iProtocolVersion == 2)
-		m_NUM_BYTE_SEND = 79;
-	else
-		m_NUM_BYTE_SEND = 50;
-
+	{	m_NUM_BYTE_SEND = 79;
+		m_iTypeLCD = LCD_60CHAR_TEXT;
+	}
+	else if(m_iProtocolVersion == 3)
+	{
+		m_NUM_BYTE_SEND = NUM_BYTE_SEND_RELAYBOARD_14;
+		m_iTypeLCD = RELAY_BOARD_1_4;
+	}
 	m_bComInit = false;
 	m_sNumComPort = ComPort;
 
@@ -91,6 +99,8 @@ SerRelayBoard::SerRelayBoard(std::string ComPort, int ProtocolVersion)
 	m_iRelBoardKeyPad = 0xFFFF;
 	m_iCmdRelayBoard = 0;
 	m_iDigIn = 0;
+	m_cSoftEMStop = 0;
+
 }
 
 //-----------------------------------------------
@@ -103,8 +113,14 @@ SerRelayBoard::~SerRelayBoard()
 int SerRelayBoard::evalRxBuffer()
 {
 	static int siNoMsgCnt = 0;
-	
-	const int c_iNrBytesMin = NUM_BYTE_REC_HEADER + NUM_BYTE_REC + NUM_BYTE_REC_CHECKSUM;
+
+	int iNumByteRec = NUM_BYTE_REC;
+	if(m_iTypeLCD == RELAY_BOARD_1_4)
+	{
+		iNumByteRec = NUM_BYTE_REC_RELAYBOARD_14;
+	}
+
+	const int c_iNrBytesMin = NUM_BYTE_REC_HEADER + iNumByteRec + NUM_BYTE_REC_CHECKSUM;
 	const int c_iSizeBuffer = 4096;
 
 	int i;
@@ -127,7 +143,7 @@ int SerRelayBoard::evalRxBuffer()
 			siNoMsgCnt = 0;
 			errorFlag = NO_MESSAGES;
 		} else errorFlag = TOO_LESS_BYTES_IN_QUEUE;
-		
+
 		return errorFlag;
 	}
 	else
@@ -193,7 +209,7 @@ bool SerRelayBoard::shutdown()
 	m_SerIO.closeIO();
 
 	m_bComInit = false;
-	
+
 	return true;
 }
 
@@ -230,15 +246,15 @@ int SerRelayBoard::sendRequest() {
 	int iNrBytesWritten;
 
 	unsigned char cMsg[m_NUM_BYTE_SEND];
-	
+
 	m_Mutex.lock();
-	
+
 		convDataToSendMsg(cMsg);
 
 		m_SerIO.purgeTx();
 
 		iNrBytesWritten = m_SerIO.writeIO((char*)cMsg, m_NUM_BYTE_SEND);
-	
+
 		if(iNrBytesWritten < m_NUM_BYTE_SEND) {
 			//std::cerr << "Error in sending message to Relayboard over SerialIO, lost bytes during writing" << std::endl;
 			errorFlag = GENERAL_SENDING_ERROR;
@@ -257,7 +273,7 @@ int SerRelayBoard::setDigOut(int iChannel, bool bOn)
 
 		if(bOn) { m_iCmdRelayBoard |= CMD_SET_CHARGE_RELAY; }
 		else { m_iCmdRelayBoard &= ~CMD_SET_CHARGE_RELAY; }
-		
+
 		break;
 
 	case 1:
@@ -306,7 +322,7 @@ int SerRelayBoard::setDigOut(int iChannel, bool bOn)
 
 		return -1;
 	}
-	
+
 	return 0;
 }
 //-----------------------------------------------
@@ -330,8 +346,107 @@ int SerRelayBoard::getDigIn()
 	return m_iDigIn;
 }
 
-//-----------------------------------------------
 void SerRelayBoard::convDataToSendMsg(unsigned char cMsg[])
+{
+	int i;
+	static int j = 0;
+	int iCnt = 0;
+	int iChkSum = 0;
+
+	if (m_cSoftEMStop & 0x02)
+	{
+		if (j == 1)
+		{
+			m_cSoftEMStop &= 0xFD;
+			j = 0;
+		}
+		else if (j == 0)
+		{
+			j = 1;
+		}
+	}
+
+	cMsg[iCnt++] = CMD_RELAISBOARD_GET_DATA;
+
+	cMsg[iCnt++] = m_iConfigRelayBoard >> 8;
+	cMsg[iCnt++] = m_iConfigRelayBoard;
+
+	cMsg[iCnt++] = m_iCmdRelayBoard >> 8;
+	cMsg[iCnt++] = m_iCmdRelayBoard;
+
+	cMsg[iCnt++] = m_iIOBoardDigOut >> 8;
+	cMsg[iCnt++] = m_iIOBoardDigOut;
+
+	cMsg[iCnt++] = m_iVelCmdMotRightEncS >> 24;
+	cMsg[iCnt++] = m_iVelCmdMotRightEncS >> 16;
+	cMsg[iCnt++] = m_iVelCmdMotRightEncS >> 8;
+	cMsg[iCnt++] = m_iVelCmdMotRightEncS;
+
+	cMsg[iCnt++] = m_iVelCmdMotLeftEncS >> 24;
+	cMsg[iCnt++] = m_iVelCmdMotLeftEncS >> 16;
+	cMsg[iCnt++] = m_iVelCmdMotLeftEncS >> 8;
+	cMsg[iCnt++] = m_iVelCmdMotLeftEncS;
+
+	if(m_iTypeLCD == RELAY_BOARD_1_4)
+	{
+		cMsg[iCnt++] = m_iVelCmdMotRearRightEncS >> 24;
+		cMsg[iCnt++] = m_iVelCmdMotRearRightEncS >> 16;
+		cMsg[iCnt++] = m_iVelCmdMotRearRightEncS >> 8;
+		cMsg[iCnt++] = m_iVelCmdMotRearRightEncS;
+
+		cMsg[iCnt++] = m_iVelCmdMotRearLeftEncS >> 24;
+		cMsg[iCnt++] = m_iVelCmdMotRearLeftEncS >> 16;
+		cMsg[iCnt++] = m_iVelCmdMotRearLeftEncS >> 8;
+		cMsg[iCnt++] = m_iVelCmdMotRearLeftEncS;
+	}
+
+	cMsg[iCnt++] = m_iUSBoardSensorActive >> 8;
+	cMsg[iCnt++] = m_iUSBoardSensorActive;
+
+	if(m_iTypeLCD == LCD_20CHAR_TEXT)
+	{
+		for(i = 0; i < 20; i++)
+		{
+			cMsg[iCnt++] = m_cTextDisplay[i];
+		}
+
+		// fill remaining msg with 0's
+		do
+		{
+			cMsg[iCnt++] = 0;
+		}
+		while(iCnt < (m_NUM_BYTE_SEND - 2));
+	}
+	else
+	{
+		for(i = 0; i < 60; i++)
+		{
+			cMsg[iCnt++] = m_cTextDisplay[i];
+		}
+	}
+
+	if(m_iTypeLCD == RELAY_BOARD_1_4)
+	{
+		cMsg[iCnt++] = m_cSoftEMStop;
+	}
+	// calc checksum
+	for(i = 0; i < (m_NUM_BYTE_SEND - 2); i++)
+	{
+		iChkSum %= 0xFF00;
+		iChkSum += cMsg[i];
+	}
+
+	cMsg[m_NUM_BYTE_SEND - 2] = iChkSum >> 8;
+	cMsg[m_NUM_BYTE_SEND - 1] = iChkSum;
+
+	// reset flags
+	m_iCmdRelayBoard &= ~CMD_RESET_POS_CNT;
+
+}
+
+
+//-----------------------------------------------
+/*void SerRelayBoard::convDataToSendMsg(unsigned char cMsg[])
 {
 	int i;
 	int iCnt = 0;
@@ -344,7 +459,7 @@ void SerRelayBoard::convDataToSendMsg(unsigned char cMsg[])
 
 	cMsg[iCnt++] = m_iCmdRelayBoard >> 8;
 	cMsg[iCnt++] = m_iCmdRelayBoard;
-	
+
 	// fill remaining msg with 0's
 	do
 	{
@@ -364,12 +479,27 @@ void SerRelayBoard::convDataToSendMsg(unsigned char cMsg[])
 	// reset flags
 	m_iCmdRelayBoard &= ~CMD_RESET_POS_CNT;
 }
-
+*/
 //-----------------------------------------------
 bool SerRelayBoard::convRecMsgToData(unsigned char cMsg[])
 {
-	const int c_iStartCheckSum = NUM_BYTE_REC;
-	
+
+	int iNumByteRec = NUM_BYTE_REC;
+	if(m_iTypeLCD == LCD_20CHAR_TEXT)
+	{
+		iNumByteRec = NUM_BYTE_REC;
+	}
+	if(m_iTypeLCD == LCD_60CHAR_TEXT)
+	{
+		iNumByteRec = NUM_BYTE_REC;
+	}
+	if(m_iTypeLCD == RELAY_BOARD_1_4)
+	{
+		iNumByteRec = NUM_BYTE_REC_RELAYBOARD_14;
+	}
+
+	const int c_iStartCheckSum = iNumByteRec;
+
 	int i;
 	unsigned int iTxCheckSum;
 	unsigned int iCheckSum;
@@ -378,10 +508,11 @@ bool SerRelayBoard::convRecMsgToData(unsigned char cMsg[])
 
 	// test checksum: checksum should be sum of all bytes
 	iTxCheckSum = (cMsg[c_iStartCheckSum + 1] << 8) | cMsg[c_iStartCheckSum];
-	
+
 	iCheckSum = 0;
 	for(i = 0; i < c_iStartCheckSum; i++)
 	{
+		iCheckSum %= 0xFF00;
 		iCheckSum += cMsg[i];
 	}
 
@@ -405,7 +536,7 @@ bool SerRelayBoard::convRecMsgToData(unsigned char cMsg[])
 	m_iRelBoardBattVoltage = (cMsg[iCnt + 1] << 8) | cMsg[iCnt];
 	iCnt += 2;
 
-	//unused at the moment	
+	//unused at the moment
 	m_iRelBoardKeyPad = (cMsg[iCnt + 1] << 8) | cMsg[iCnt];
 	iCnt += 2;
 
@@ -419,7 +550,7 @@ bool SerRelayBoard::convRecMsgToData(unsigned char cMsg[])
 	//unused at the moment
 	m_iRelBoardTempSensor = (cMsg[iCnt + 1] << 8) | cMsg[iCnt];
 	iCnt += 2;
-	
+
 	//Digital Inputs
 	//unused at the moment
 	m_iDigIn = (cMsg[iCnt + 1] << 8) | cMsg[iCnt];

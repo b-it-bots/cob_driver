@@ -2,7 +2,7 @@
  *
  * Copyright (c) 2010
  *
- * Fraunhofer Institute for Manufacturing Engineering	
+ * Fraunhofer Institute for Manufacturing Engineering
  * and Automation (IPA)
  *
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -12,9 +12,9 @@
  * ROS package name: cob_light
  * Description: Switch robots led color by sending data to
  * the led-µC over serial connection.
- *								
+ *
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- *			
+ *
  * Author: Benjamin Maidel, email:benjamin.maidel@ipa.fraunhofer.de
  * Supervised by: Benjamin Maidel, email:benjamin.maidel@ipa.fraunhofer.de
  *
@@ -31,23 +31,23 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the Fraunhofer Institute for Manufacturing 
+ *     * Neither the name of the Fraunhofer Institute for Manufacturing
  *       Engineering and Automation (IPA) nor the names of its
  *       contributors may be used to endorse or promote products derived from
  *       this software without specific prior written permission.
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License LGPL as 
- * published by the Free Software Foundation, either version 3 of the 
+ * it under the terms of the GNU Lesser General Public License LGPL as
+ * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License LGPL for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public 
- * License LGPL along with this program. 
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License LGPL along with this program.
  * If not, see <http://www.gnu.org/licenses/>.
  *
  ****************************************************************/
@@ -59,119 +59,175 @@ ModeExecutor::ModeExecutor(IColorO* colorO)
 : _stopRequested(false), default_priority(0)
 {
 	_colorO = colorO;
-	_activeMode = NULL;
+	_colorO->signalColorSet()->connect(boost::bind(&ModeExecutor::onColorSetReceived, this, _1));
 }
 
 ModeExecutor::~ModeExecutor()
 {
-	
 }
 
-void ModeExecutor::execute(cob_light::LightMode requestedMode)
+uint64_t ModeExecutor::execute(cob_light::LightMode requestedMode)
 {
-	Mode* mode = ModeFactory::create(requestedMode);
+	boost::shared_ptr<Mode> mode = ModeFactory::create(requestedMode, _colorO);
 	// check if mode was correctly created
-	if(mode != NULL)
-		execute(mode);
+	if(mode)
+		return execute(mode);
 }
 
-void ModeExecutor::execute(Mode* mode)
+uint64_t ModeExecutor::execute(boost::shared_ptr<Mode> mode)
 {
-	// check if a mode is already executed
-	if(_activeMode != NULL)
+	uint64_t u_id;
+
+	// check if modes allready executing
+	if(_mapActiveModes.size() > 0)
 	{
-		// check if priority from requested mode is higher or the same
-		if(_activeMode->getPriority() <= mode->getPriority())
+		// check if mode with lower prio is running
+		if(_mapActiveModes.begin()->first < mode->getPriority())
 		{
-			stop();
-			_activeMode = mode;
-			_activeMode->signalColorReady()->connect(boost::bind(&IColorO::setColor, _colorO, _1));
-			_thread_ptr.reset(new boost::thread(boost::lambda::bind(&ModeExecutor::run, this)));
-			ROS_INFO("Executing new mode: %s",_activeMode->getName().c_str() );
-			ROS_DEBUG("Executing Mode %i with prio: %i freq: %f timeout: %f pulses: %i ",
-				ModeFactory::type(mode), mode->getPriority(), mode->getFrequency(), mode->getTimeout(), mode->getPulses());
+			ROS_DEBUG("Pause mode: %i with prio %i",
+				ModeFactory::type(_mapActiveModes.begin()->second.get()), _mapActiveModes.begin()->second->getPriority());
+			_mapActiveModes.begin()->second->pause();
 		}
 		else
-			ROS_DEBUG("Mode with higher priority is allready executing");
+		{
+			std::map<int, boost::shared_ptr<Mode>, std::greater<int> >::iterator itr;
+			itr = _mapActiveModes.find(mode->getPriority());
+			if(itr != _mapActiveModes.end())
+			{
+				ROS_DEBUG("Stopping mode: %i with prio %i",
+					ModeFactory::type(itr->second.get()), itr->second->getPriority());
+				itr->second->stop();
+				_mapActiveModes.erase(itr);
+			}
+		}
 	}
-	else
-	{
-		_activeMode = mode;
-		_activeMode->signalColorReady()->connect(boost::bind(&IColorO::setColor, _colorO, _1));
-		_thread_ptr.reset(new boost::thread(boost::lambda::bind(&ModeExecutor::run, this)));
-		ROS_INFO("Executing new mode: %s",_activeMode->getName().c_str() );
-		ROS_DEBUG("Executing Mode %i with prio: %i freq: %f timeout: %f pulses: %i ",
-				ModeFactory::type(mode), mode->getPriority(), mode->getFrequency(), mode->getTimeout(), mode->getPulses());
-	}
+	mode->signalColorReady()->connect(boost::bind(&IColorO::setColor, _colorO, _1));
+	mode->signalColorsReady()->connect(boost::bind(&IColorO::setColorMulti, _colorO, _1));
+	mode->signalModeFinished()->connect(boost::bind(&ModeExecutor::onModeFinishedReceived, this, _1));
+	mode->setActualColor(_activeColor);
+	ROS_DEBUG("Attaching Mode %i with prio: %i freq: %f timeout: %f pulses: %i ",
+		ModeFactory::type(mode.get()), mode->getPriority(), mode->getFrequency(), mode->getTimeout(), mode->getPulses());
+	_mapActiveModes.insert(std::pair<int, boost::shared_ptr<Mode> >(mode->getPriority(), mode));
 
+	if(!_mapActiveModes.begin()->second->isRunning())
+	{
+		ROS_DEBUG("Executing Mode %i with prio: %i freq: %f timeout: %f pulses: %i ",
+			ModeFactory::type(mode.get()), mode->getPriority(), mode->getFrequency(), mode->getTimeout(), mode->getPulses());
+		_mapActiveModes.begin()->second->start();
+	}
+	Mode* ptr = mode.get();
+	u_id = reinterpret_cast<uint64_t>( ptr );
+	return u_id;
 }
 
-void ModeExecutor::run()
+void ModeExecutor::pause()
 {
-	ros::Rate r(10);
-	if(_activeMode->getFrequency() != 0.0)
-		r = ros::Rate(_activeMode->getFrequency());
-	else
-		_activeMode->setFrequency(10);
-
-	ros::Time timeStart = ros::Time::now();
-
-	while(!isStopRequested() && !ros::isShuttingDown())
+	if(_mapActiveModes.size() > 0)
 	{
-		_activeMode->execute();
-
-		if((_activeMode->getPulses() != 0) && 
-			(_activeMode->getPulses() <= _activeMode->pulsed()))
-			break;
-
-		if(_activeMode->getTimeout() != 0)
-		{
-			ros::Duration timePassed = ros::Time::now() - timeStart;
-			if(timePassed.toSec() >= _activeMode->getTimeout())
-				break;
-		}
-		r.sleep();
+		_mapActiveModes.begin()->second->pause();
 	}
-	ROS_INFO("Mode %s finished",_activeMode->getName().c_str());
-	delete _activeMode;
-	_activeMode = NULL;
+}
+
+void ModeExecutor::resume()
+{
+	if(_mapActiveModes.size() > 0 && !_mapActiveModes.begin()->second->isRunning())
+		_mapActiveModes.begin()->second->start();
 }
 
 void ModeExecutor::stop()
 {
-	_mutex.lock();
-	_stopRequested = true;
-	_mutex.unlock();
-
-	if (_thread_ptr)
-		_thread_ptr->join();
-
-	_mutex.lock();
-	_stopRequested = false;
-	_mutex.unlock();
-
+	if(_mapActiveModes.size() > 0)
+	{
+		std::map<int, boost::shared_ptr<Mode>, std::greater<int> >::iterator itr;
+		for(itr = _mapActiveModes.begin(); itr != _mapActiveModes.end(); itr++)
+		{
+			itr->second->stop();
+		}
+		_mapActiveModes.clear();
+	}
 }
 
-bool ModeExecutor::isStopRequested()
+bool ModeExecutor::stop(uint64_t uId)
 {
-	bool ret;
-	_mutex.lock();
-	ret =_stopRequested;
-	_mutex.unlock();
+	bool ret = false;
+	if(_mapActiveModes.size() > 0)
+	{
+		std::map<int, boost::shared_ptr<Mode>, std::greater<int> >::iterator itr;
+		for(itr = _mapActiveModes.begin(); itr != _mapActiveModes.end(); itr++)
+		{
+			uint64_t uid = reinterpret_cast<uint64_t>(itr->second.get());
+			if(uid == uId)
+			{
+				ROS_DEBUG("Stopping mode: %i with prio %i",
+					ModeFactory::type(itr->second.get()), itr->second->getPriority());
+				itr->second->stop();
+				_mapActiveModes.erase(itr);
+
+				if(_mapActiveModes.size() > 0)
+				{
+					if(!_mapActiveModes.begin()->second->isRunning())
+					{
+						ROS_DEBUG("Resume mode: %i with prio %i",
+							ModeFactory::type(_mapActiveModes.begin()->second.get()), _mapActiveModes.begin()->second->getPriority());
+						_mapActiveModes.begin()->second->start();
+					}
+				}
+				ret = true;
+				break;
+			}
+		}
+	}
 	return ret;
+}
+void ModeExecutor::onModeFinishedReceived(int prio)
+{
+	//check if finished mode is the current active
+	if(_mapActiveModes.begin()->first == prio)
+	{
+		//erase mode from map and exec mode with next lower prio
+		_mapActiveModes.erase(prio);
+		if(_mapActiveModes.size() > 0)
+		{
+			ROS_DEBUG("Resume mode: %i with prio %i",
+				ModeFactory::type(_mapActiveModes.begin()->second.get()), _mapActiveModes.begin()->second->getPriority());
+			_mapActiveModes.begin()->second->start();
+		}
+	}
+	//finished mode is not the current executing one (this should never happen)
+	else
+	{
+		ROS_WARN("Mode finished which should't be executed");
+		_mapActiveModes.erase(prio);
+	}
+}
+
+void ModeExecutor::onColorSetReceived(color::rgba color)
+{
+  _activeColor = color;
 }
 
 int ModeExecutor::getExecutingMode()
 {
-	return ModeFactory::type(_activeMode);
+	if(_mapActiveModes.size() > 0)
+		return ModeFactory::type(_mapActiveModes.begin()->second.get());
+	else
+		return ModeFactory::type(NULL);
 }
 
 int ModeExecutor::getExecutingPriority()
 {
-	if(_activeMode != NULL)
-		return _activeMode->getPriority();
+	if(_mapActiveModes.size()>0)
+		return _mapActiveModes.begin()->second->getPriority();
 	else
 		return default_priority;
+}
+
+uint64_t ModeExecutor::getExecutingUId()
+{
+	if(_mapActiveModes.size()>0)
+		return reinterpret_cast<uint64_t>(_mapActiveModes.begin()->second.get());
+	else
+		return 0;
 }
 
 void ModeExecutor::setDefaultPriority(int priority)

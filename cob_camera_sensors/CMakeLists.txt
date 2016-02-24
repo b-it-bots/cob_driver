@@ -1,83 +1,40 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(cob_camera_sensors)
 
-find_package(catkin REQUIRED COMPONENTS roscpp pluginlib message_generation message_filters sensor_msgs nodelet)
+find_package(catkin REQUIRED COMPONENTS cmake_modules cob_vision_utils cv_bridge image_transport message_filters message_generation polled_camera roscpp sensor_msgs)
 
-#######################################
-## Declare ROS messages and services ##
-#######################################
+find_package(Boost REQUIRED COMPONENTS filesystem thread)
 
+find_package(OpenCV REQUIRED)
+
+find_package(TinyXML REQUIRED)
+
+### Message Generation ###
 add_service_files(
   FILES
-  AcquireCalibrationImages.srv 
+  AcquireCalibrationImages.srv
   GetTOFImages.srv
 )
 
-## Generate added messages and services with any dependencies listed here
-
 generate_messages(
-   DEPENDENCIES std_msgs sensor_msgs
+   DEPENDENCIES sensor_msgs
 )
 
-###################################
-## catkin specific configuration ##
-###################################
 catkin_package(
-    DEPENDS #
-    CATKIN_DEPENDS roscpp pluginlib message_runtime message_filters nodelet
-    INCLUDE_DIRS common/include
-    LIBRARIES # TODO
+  CATKIN_DEPENDS cmake_modules cob_vision_utils message_runtime roscpp sensor_msgs
+  DEPENDS Boost OpenCV
+  INCLUDE_DIRS common/include
 )
 
+### INSTALL ###
+install(DIRECTORY common/include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+)
 
-###########
-## Build ##
-###########
-# add include search paths
-#INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/common/include)
+install(FILES common/scripts/generateYAMLparameterFile.m
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/common/scripts
+)
 
-
-# add project executable
-#add_executable(tof_camera ros/src/tof_camera.cpp)
-#add_executable(tof_camera_viewer ros/src/tof_camera_viewer.cpp)
-#add_executable(color_camera ros/src/color_camera.cpp)
-#add_executable(all_cameras ros/src/all_cameras.cpp)
-#add_executable(all_camera_viewer ros/src/all_camera_viewer.cpp)
-#add_executable(undistort_tof ros/src/undistort_tof.cpp)
-
-# add include search paths
-#include_directories(${PROJECT_SOURCE_DIR}/common/include)
-
-# add compile flag
-#
-# CATKIN_MIGRATION
-# use link_directories() include_directories(), add_definitions(), target_link_libraries() or set_target_properties
-# rosbuild_add_compile_flags(cob_camera_sensors -D__LINUX__ -D__COB_ROS__)
-#
-# CATKIN_MIGRATION
-# use link_directories() include_directories(), add_definitions(), target_link_libraries() or set_target_properties
-# rosbuild_add_compile_flags(tof_camera -D__LINUX__ -D__COB_ROS__)
-#
-# CATKIN_MIGRATION
-# use link_directories() include_directories(), add_definitions(), target_link_libraries() or set_target_properties
-# rosbuild_add_compile_flags(tof_camera_viewer -D__LINUX__ -D__COB_ROS__)
-#
-# CATKIN_MIGRATION
-# use link_directories() include_directories(), add_definitions(), target_link_libraries() or set_target_properties
-# rosbuild_add_compile_flags(color_camera -D__LINUX__ -D__COB_ROS__)
-#
-# CATKIN_MIGRATION
-# use link_directories() include_directories(), add_definitions(), target_link_libraries() or set_target_properties
-# rosbuild_add_compile_flags(all_cameras -D__LINUX__ -D__COB_ROS__)
-#
-# CATKIN_MIGRATION
-# use link_directories() include_directories(), add_definitions(), target_link_libraries() or set_target_properties
-# rosbuild_add_compile_flags(all_camera_viewer -D__LINUX__ -D__COB_ROS__ -D__ROS_1_1__)
-
-# link libraries
-#target_link_libraries(cob_camera_sensors mesasr dc1394 tinyxml)
-#target_link_libraries(tof_camera cob_camera_sensors usb)
-#target_link_libraries(tof_camera_viewer cob_camera_sensors)
-#target_link_libraries(color_camera cob_camera_sensors)
-#target_link_libraries(all_cameras cob_camera_sensors usb)
-
+install(PROGRAMS ros/scripts/set_camera_info.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)

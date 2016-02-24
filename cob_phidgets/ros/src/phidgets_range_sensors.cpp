@@ -1,6 +1,6 @@
 // see http://www.phidgets.com/products.php?category=2&product_id=3520_0
 // distance calculation: Distance (cm) = 2076/(SensorValue - 11)             (the formula is only valid for a SensorValue between 80 to 530)
-// TODO: separate into two packages: cob_phidgets_driver (publishing only raw values as sensor_msgs/Range message) and cob_tray_status (evaluating the Range messages to decide if tray is occupied or not, eventually also at which position it is occupied) 
+// TODO: separate into two packages: cob_phidgets_driver (publishing only raw values as sensor_msgs/Range message) and cob_tray_status (evaluating the Range messages to decide if tray is occupied or not, eventually also at which position it is occupied)
 
 #include "ros/ros.h"
 #include "std_msgs/Bool.h"
@@ -21,9 +21,7 @@ public:
 	Sensor(const std::string &fr_id, const int id, const int filter_size = 10) :
 			id_(id), filter_size_(filter_size), frame_id_(fr_id)
 	{
-		char buffer[256];
-		sprintf(buffer, "range_%d", id);
-		pub_range_ = n_.advertise<sensor_msgs::Range>(buffer, 0);
+		pub_range_ = n_.advertise<sensor_msgs::Range>(frame_id_, 0);
 	}
 
 	void publish()

@@ -65,6 +65,8 @@
 #include <cob_phidgets/SetDataRate.h>
 #include <cob_phidgets/SetDigitalSensor.h>
 #include <cob_phidgets/SetTriggerValue.h>
+#include <cob_phidgets/DigitalSensor.h>
+#include <cob_phidgets/AnalogSensor.h>
 
 #include <thread>
 #include <mutex>
@@ -80,11 +82,13 @@ private:
 	ros::NodeHandle _nh;
 	ros::Publisher _pubAnalog;
 	ros::Publisher _pubDigital;
+	ros::Subscriber _subDigital;
 	ros::ServiceServer _srvDigitalOut;
 	ros::ServiceServer _srvDataRate;
 	ros::ServiceServer _srvTriggerValue;
 
 	int _serial_num;
+	std::string _board_name;
 
 	struct OutputCompare
 	{
@@ -97,9 +101,13 @@ private:
 	std::mutex _mutex;
 
 	std::map<int, std::string> _indexNameMapAnalog;
+	std::map<std::string, int> _indexNameMapAnalogRev;
 	std::map<int, std::string> _indexNameMapDigitalIn;
+	std::map<std::string, int> _indexNameMapDigitalInRev;
 	std::map<int, std::string> _indexNameMapDigitalOut;
+	std::map<std::string, int> _indexNameMapDigitalOutRev;
 	std::map<int, std::string>::iterator _indexNameMapItr;
+	std::map<std::string, int>::iterator _indexNameMapRevItr;
 
 	auto readParams(XmlRpc::XmlRpcValue* sensor_params) -> void;
 
@@ -112,6 +120,7 @@ private:
 	auto outputChangeHandler(int index, int outputState) -> int;
 	auto sensorChangeHandler(int index, int sensorValue) -> int;
 
+	auto onDigitalOutCallback(const cob_phidgets::DigitalSensorConstPtr& msg) -> void;
 	auto setDigitalOutCallback(cob_phidgets::SetDigitalSensor::Request &req,
 										cob_phidgets::SetDigitalSensor::Response &res) -> bool;
 	auto setDataRateCallback(cob_phidgets::SetDataRate::Request &req,

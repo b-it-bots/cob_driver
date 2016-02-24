@@ -2,7 +2,7 @@
  *
  * Copyright (c) 2010
  *
- * Fraunhofer Institute for Manufacturing Engineering	
+ * Fraunhofer Institute for Manufacturing Engineering
  * and Automation (IPA)
  *
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -11,9 +11,9 @@
  * ROS stack name: cob_drivers
  * ROS package name: cob_generic_can
  * Description:
- *								
+ *
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- *			
+ *
  * Author: Christian Connette, email:christian.connette@ipa.fhg.de
  * Supervised by: Christian Connette, email:christian.connette@ipa.fhg.de
  *
@@ -30,23 +30,23 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the Fraunhofer Institute for Manufacturing 
+ *     * Neither the name of the Fraunhofer Institute for Manufacturing
  *       Engineering and Automation (IPA) nor the names of its
  *       contributors may be used to endorse or promote products derived from
  *       this software without specific prior written permission.
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License LGPL as 
- * published by the Free Software Foundation, either version 3 of the 
+ * it under the terms of the GNU Lesser General Public License LGPL as
+ * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License LGPL for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public 
- * License LGPL along with this program. 
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License LGPL along with this program.
  * If not, see <http://www.gnu.org/licenses/>.
  *
  ****************************************************************/
@@ -84,14 +84,21 @@ CanPeakSys::~CanPeakSys()
 }
 
 //-----------------------------------------------
+bool CanPeakSys::init_ret()
+{
+	// Not implemented yet
+	return false;
+}
+
+//-----------------------------------------------
 void CanPeakSys::init()
 {
- std::string sCanDevice; 
+ std::string sCanDevice;
  if( m_IniFile.GetKeyString( "TypeCan", "DevicePath", &sCanDevice, false) != 0) {
 		sCanDevice = "/dev/pcan32";
 	} else std::cout << "CAN-device path read from ini-File: " << sCanDevice << std::endl;
 	m_handle = LINUX_CAN_Open(sCanDevice.c_str(), O_RDWR);
-	
+
 
 	if (! m_handle)
 	{
@@ -100,33 +107,33 @@ void CanPeakSys::init()
 		sleep(3);
 		exit(0);
 	}
-	
-	
+
+
 	int ret = CAN_ERR_OK;
 	int iBaudrateVal = 0;
 	m_IniFile.GetKeyInt( "CanCtrl", "BaudrateVal", &iBaudrateVal, true);
-	
+
 	switch(iBaudrateVal)
 	{
-	case 0:
+	case CANITFBAUD_1M:
 		ret = CAN_Init(m_handle, CAN_BAUD_1M, CAN_INIT_TYPE_ST);
 		break;
-	case 2:
+	case CANITFBAUD_500K:
 		ret = CAN_Init(m_handle, CAN_BAUD_500K, CAN_INIT_TYPE_ST);
 		break;
-	case 4:
+	case CANITFBAUD_250K:
 		ret = CAN_Init(m_handle, CAN_BAUD_250K, CAN_INIT_TYPE_ST);
 		break;
-	case 6:
+	case CANITFBAUD_125K:
 		ret = CAN_Init(m_handle, CAN_BAUD_125K, CAN_INIT_TYPE_ST);
 		break;
-	case 9:
+	case CANITFBAUD_50K:
 		ret = CAN_Init(m_handle, CAN_BAUD_50K, CAN_INIT_TYPE_ST);
 		break;
-	case 11:
+	case CANITFBAUD_20K:
 		ret = CAN_Init(m_handle, CAN_BAUD_20K, CAN_INIT_TYPE_ST);
 		break;
-	case 13:
+	case CANITFBAUD_10K:
 		ret = CAN_Init(m_handle, CAN_BAUD_10K, CAN_INIT_TYPE_ST);
 		break;
 	}
@@ -156,7 +163,7 @@ bool CanPeakSys::transmitMsg(CanMsg CMsg, bool bBlocking)
 	TPCMsg.MSGTYPE = CMsg.m_iType;
 	for(int i=0; i<8; i++)
 		TPCMsg.DATA[i] = CMsg.getAt(i);
-	
+
 	// write msg
 	int iRet;
 	iRet = CAN_Write(m_handle, &TPCMsg);
@@ -179,7 +186,7 @@ bool CanPeakSys::receiveMsg(CanMsg* pCMsg)
 	TPCMsg.Msg.LEN = 8;
 	TPCMsg.Msg.MSGTYPE = 0;
 	TPCMsg.Msg.ID = 0;
-	
+
 	int iRet = CAN_ERR_OK;
 	bool bRet = false;
 
@@ -254,3 +261,36 @@ bool CanPeakSys::receiveMsgRetry(CanMsg* pCMsg, int iNrOfRetry)
 	return bRet;
 }
 
+//-------------------------------------------
+bool CanPeakSys::receiveMsgTimeout(CanMsg* pCMsg, int nSecTimeout)
+{
+    int iRet = CAN_ERR_OK;
+
+    TPCANRdMsg TPCMsg;
+    TPCMsg.Msg.LEN = 8;
+    TPCMsg.Msg.MSGTYPE = 0;
+    TPCMsg.Msg.ID = 0;
+
+    if (m_bInitialized == false) return false;
+
+    bool bRet = true;
+
+    iRet = LINUX_CAN_Read_Timeout(m_handle, &TPCMsg, nSecTimeout);
+
+    // eval return value
+    if(iRet != CAN_ERR_OK)
+    {
+	std::cout << "CANPeakSysUSB::receiveMsgRetry, errorcode= " << nGetLastError() << std::endl;
+	pCMsg->set(0, 0, 0, 0, 0, 0, 0, 0);
+	bRet = false;
+    }
+    else
+    {
+	pCMsg->setID(TPCMsg.Msg.ID);
+	pCMsg->setLength(TPCMsg.Msg.LEN);
+	pCMsg->set(TPCMsg.Msg.DATA[0], TPCMsg.Msg.DATA[1], TPCMsg.Msg.DATA[2], TPCMsg.Msg.DATA[3],
+		    TPCMsg.Msg.DATA[4], TPCMsg.Msg.DATA[5], TPCMsg.Msg.DATA[6], TPCMsg.Msg.DATA[7]);
+    }
+
+    return bRet;
+}

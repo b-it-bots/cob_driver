@@ -73,7 +73,7 @@ PhidgetManager::PhidgetManager()
 
 PhidgetManager::~PhidgetManager()
 {
-	// Close the manager    
+	// Close the manager
 	CPhidgetManager_close((CPhidgetManagerHandle) _manHandle);
 	CPhidgetManager_delete((CPhidgetManagerHandle) _manHandle);
 
@@ -84,9 +84,9 @@ auto PhidgetManager::getAttachedDevices()-> std::vector<AttachedDevice>
 {
 	CPhidgetHandle* phidgetList;
 	int count;
-
+	ROS_INFO("getting attached Devices");
 	CPhidgetManager_getAttachedDevices((CPhidgetManagerHandle) _manHandle, &phidgetList, &count);
- 
+
  	std::vector<AttachedDevice> attachedDevices;
 	int serialNumber;
 	const char *name;
@@ -101,7 +101,7 @@ auto PhidgetManager::getAttachedDevices()-> std::vector<AttachedDevice>
 		attachedDevices.push_back(device);
 	}
 
-	// Use the Phidget API to free the memory in the phidgetList Array    
+	// Use the Phidget API to free the memory in the phidgetList Array
 	CPhidgetManager_freeAttachedDevicesArray(phidgetList);
 
 	return attachedDevices;
