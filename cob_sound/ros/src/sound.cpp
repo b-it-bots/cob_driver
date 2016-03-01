@@ -45,6 +45,14 @@ public:
     diagnostics_timer_ = nh_.createTimer(ros::Duration(1.0), &SoundAction::timer_cb, this);
     pubMarker_ = nh_.advertise<visualization_msgs::Marker>("marker",1); //Advertise visualization marker topic
     mute_ = false;
+
+    nh_ = ros::NodeHandle("~");
+    if(!nh_.hasParam("cepstral_settings"))
+      ROS_WARN("Parameter 'cepstral_settings' is missing. Using default Value: \"speech/rate=170\"");
+    if(!nh_.hasParam("mode"))
+      ROS_WARN("Parameter 'mode' is missing. Using default Value: festival");
+    if(!nh_.hasParam("cepstral_voice"))
+      ROS_WARN("Parameter 'cepstral_voice' is missing. Using default Value: David");
   }
 
   ~SoundAction(void)
