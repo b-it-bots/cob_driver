@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import csv
 import rospy
 from cob_phidgets.msg import *
 
