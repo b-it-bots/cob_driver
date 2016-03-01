@@ -115,10 +115,10 @@ class volts_filter():
             self.t_est = 0
 
         self.msg_power.header.stamp = rospy.Time.now()
-        self.msg_power.time_remaining.secs = self.t_est
-        self.msg_power.prediction_method = '3rd_order_polynom'
-        self.msg_power.relative_capacity = (self.t_est/self.maximum_time) * 100
-        self.msg_power.AC_present = 0
+        self.msg_power.time_remaining = self.t_est
+        #self.msg_power.prediction_method = '3rd_order_polynom'
+        self.msg_power.relative_remaining_capacity = (self.t_est/self.maximum_time) * 100
+        self.msg_power.charging = 0
 
         self.pub_power.publish(self.msg_power)
 
