@@ -79,7 +79,7 @@ class volts_filter():
         size = 2*self.wsize+1
         self.volt_filt = 48000*np.ones(size)
 
-        rospy.Subscriber("/power_board/voltage", Float64, self.callback)
+        rospy.Subscriber("/voltage", Float64, self.callback)
 
         self.pub_power = rospy.Publisher('/power_state', PowerState, queue_size=1)
         self.msg_power = PowerState()
