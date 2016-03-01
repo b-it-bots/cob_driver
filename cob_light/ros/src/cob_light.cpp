@@ -160,6 +160,10 @@ public:
       ROS_WARN("Parameter 'marker_frame' is missing. Using default Value: /base_link");
     _nh.param<std::string>("marker_frame",_sMarkerFrame,"base_link");
 
+    if(!_nh.hasParam("marker_x_offset"))
+      ROS_WARN("Parameter 'marker_x_offset' is missing. Using default Value: 0.5");
+    _nh.param<double>("marker_x_offset",_dMarkerXOffset,0.5);
+
     if(!_nh.hasParam("sim_enabled"))
       ROS_WARN("Parameter 'sim_enabled' is missing. Using default Value: false");
     _nh.param<bool>("sim_enabled", _bSimEnabled, false);
@@ -440,7 +444,7 @@ public:
     marker.id = 0;
     marker.type = visualization_msgs::Marker::SPHERE;
     marker.action = visualization_msgs::Marker::ADD;
-    marker.pose.position.x = 0.5;
+    marker.pose.position.x = _dMarkerXOffset;
     marker.pose.position.y = 0.0;
     marker.pose.position.z = 0.0;
     marker.pose.orientation.x = 0.0;
@@ -464,6 +468,7 @@ private:
   int _invertMask;
   bool _bPubMarker;
   std::string _sMarkerFrame;
+  double _dMarkerXOffset;
   bool _bSimEnabled;
   int _num_leds;
 
