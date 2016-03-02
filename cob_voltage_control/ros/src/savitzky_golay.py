@@ -69,8 +69,8 @@ class volts_filter():
 
     def __init__(self):
         self.volts_raw = 0.0
-        self.volts_filtered = 0.0
-        self.temperature = 0.0
+        self.volts_filtered = None
+        self.temperature = None
         self.wsize = 61
         self.filter_order = 3
         self.theta = rospy.get_param("~theta")
@@ -98,37 +98,39 @@ class volts_filter():
         elif(self.volts_filtered >= 48000):
             self.volts_filtered = 48000
 
-        self.process_voltage()
-
     def temperature_callback(self, msg):
 
         self.temperature = msg.data
 
     def process_voltage(self):
 
-        self.volt_filt = np.insert(self.volt_filt, 0, self.volts_filtered)
-        self.volt_filt = np.delete(self.volt_filt, -1)
-
-        vfilt = self.sg.filter(self.volt_filt)
-
-        old_settings = np.seterr(all='raise')
-
-        self.t_est = np.polyval(self.abcd, vfilt[self.wsize])
-
-        self.t_est = vfilt[self.wsize]*sin(self.theta) + self.t_est*cos(self.theta)
-        self.t_est = self.t_est + self.off_y
-
-        if(self.t_est <0):
-            self.t_est = 0
-
         self.msg_power.header.stamp = rospy.Time.now()
-        self.msg_power.voltage = self.volts_raw
-        self.msg_power.time_remaining = self.t_est
-        #self.msg_power.prediction_method = '3rd_order_polynom'
-        self.msg_power.relative_remaining_capacity = (self.t_est/self.maximum_time) * 100
-        self.msg_power.temperature = self.temperature
-        self.msg_power.charging = 0
 
+        if (self.volts_filtered != None):
+            self.volt_filt = np.insert(self.volt_filt, 0, self.volts_filtered)
+            self.volt_filt = np.delete(self.volt_filt, -1)
+
+            vfilt = self.sg.filter(self.volt_filt)
+
+            old_settings = np.seterr(all='raise')
+
+            self.t_est = np.polyval(self.abcd, vfilt[self.wsize])
+
+            self.t_est = vfilt[self.wsize]*sin(self.theta) + self.t_est*cos(self.theta)
+            self.t_est = self.t_est + self.off_y
+
+            if(self.t_est <0):
+                self.t_est = 0
+
+            self.msg_power.voltage = self.volts_raw
+            self.msg_power.time_remaining = self.t_est
+            #self.msg_power.prediction_method = '3rd_order_polynom'
+            self.msg_power.relative_remaining_capacity = (self.t_est/self.maximum_time) * 100
+
+        if (self.temperature != None):
+            self.msg_power.temperature = self.temperature
+
+        self.msg_power.charging = 0
 
         self.pub_power.publish(self.msg_power)
 
@@ -137,4 +139,5 @@ if __name__ == '__main__':
     vf = volts_filter()
 
     while not rospy.is_shutdown():
+        vf.process_voltage()
         rospy.sleep(1.0)
