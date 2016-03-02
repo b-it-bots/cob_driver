@@ -68,6 +68,7 @@ from cob_msgs.msg import EmergencyStopState, PowerState
 class volts_filter():
 
     def __init__(self):
+        self.volts = 0.0
         self.volts = 0.
         self.wsize = 61
         self.filter_order = 3
