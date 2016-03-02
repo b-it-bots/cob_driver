@@ -85,6 +85,7 @@ public:
   // topics to publish
   ros::Publisher topicPub_isEmergencyStop;
   ros::Publisher topicPub_Voltage;
+  ros::Publisher topicPub_Temperature;
   // topics to subscribe, callback is called for new messages arriving
   // --
 
@@ -95,7 +96,8 @@ public:
     n_priv = ros::NodeHandle("~");
 
     topicPub_isEmergencyStop = n.advertise<cob_msgs::EmergencyStopState>("emergency_stop_state", 1);
-    topicPub_Voltage = n.advertise<std_msgs::Float64>("voltage", 1);
+    topicPub_Voltage = n_priv.advertise<std_msgs::Float64>("voltage", 1);
+    topicPub_Temperature = n_priv.advertise<std_msgs::Float64>("temperature", 1);
 
     // Make sure member variables have a defined state at the beginning
     EM_stop_status_ = ST_EM_FREE;
@@ -114,6 +116,7 @@ public:
 
   void sendEmergencyStopStates();
   void sendBatteryVoltage();
+  void sendTemperature();
   int init();
 
 private:
@@ -230,6 +233,13 @@ void NodeClass::sendBatteryVoltage()
   topicPub_Voltage.publish(voltage);
 }
 
+void NodeClass::sendTemperature()
+{
+  std_msgs::Float64 temperature;
+  temperature.data = m_SerRelayBoard->getTemperature();
+  topicPub_Temperature.publish(temperature);
+}
+
 void NodeClass::sendEmergencyStopStates()
 {
   requestBoardStatus();
@@ -237,7 +247,7 @@ void NodeClass::sendEmergencyStopStates()
   if(!relayboard_available) return;
 
   sendBatteryVoltage();
-
+  sendTemperature();
 
   bool EM_signal;
   ros::Duration duration_since_EM_confirmed;

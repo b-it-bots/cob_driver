@@ -95,6 +95,10 @@ public:
 	{
 		return m_iChargeCurrent;
 	}
+	int getTemperature()
+	{
+		return m_iRelBoardTempSensor;
+	}
 
 
 	enum RelBoardReturns
