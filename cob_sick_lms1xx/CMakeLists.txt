@@ -5,7 +5,7 @@ find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs)
 
 find_package(Boost REQUIRED)
 
-catkin_package(i
+catkin_package(
   CATKIN_DEPENDS
     sensor_msgs
 )
