@@ -4,6 +4,9 @@ project(cob_relayboard)
 find_package(catkin REQUIRED COMPONENTS cob_msgs roscpp std_msgs)
 
 catkin_package(
+  CATKIN_DEPENDS
+    cob_msgs
+    std_msgs
   INCLUDE_DIRS common/include
   LIBRARIES ${PROJECT_NAME}_SerialIO ${PROJECT_NAME}
 )

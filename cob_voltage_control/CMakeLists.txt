@@ -5,7 +5,11 @@ find_package(catkin REQUIRED COMPONENTS cob_msgs cob_phidgets dynamic_reconfigur
 
 generate_dynamic_reconfigure_options(cfg/cob_voltage_control.cfg)
 
-catkin_package()
+catkin_package(
+  CATKIN_DEPENDS
+    cob_msgs
+    std_msgs
+)
 
 ### BUILD ###
 include_directories(common/src ${catkin_INCLUDE_DIRS})
