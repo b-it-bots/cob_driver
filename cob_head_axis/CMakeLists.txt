@@ -3,7 +3,12 @@ project(cob_head_axis)
 
 find_package(catkin REQUIRED COMPONENTS actionlib cob_canopen_motor cob_generic_can cob_srvs cob_utilities control_msgs diagnostic_msgs roscpp sensor_msgs std_srvs urdf)
 
-catkin_package()
+catkin_package(
+  CATKIN_DEPENDS
+    control_msgs
+    sensor_msgs
+    diagnostic_msgs
+)
 
 ### BUILD ###
 include_directories(common/include ${catkin_INCLUDE_DIRS})

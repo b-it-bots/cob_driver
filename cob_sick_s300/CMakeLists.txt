@@ -5,7 +5,12 @@ find_package(catkin REQUIRED COMPONENTS diagnostic_msgs roscpp sensor_msgs std_m
 
 find_package(Boost REQUIRED COMPONENTS date_time thread)
 
-catkin_package()
+catkin_package(
+  CATKIN_DEPENDS
+    diagnostic_msgs
+    sensor_msgs
+    std_msgs
+)
 
 ### BUILD ###
 include_directories(common/include common/src ${Boost_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})

@@ -35,7 +35,10 @@ add_service_files(
 generate_messages(DEPENDENCIES std_msgs)
 
 catkin_package(
-  CATKIN_DEPENDS message_runtime std_msgs
+  CATKIN_DEPENDS
+    message_runtime
+    sensor_msgs
+    std_msgs
 )
 
 ### BUILD ###

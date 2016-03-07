@@ -1,7 +1,18 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(cob_sound)
 
-find_package(catkin REQUIRED COMPONENTS actionlib_msgs actionlib cob_srvs diagnostic_msgs message_generation roscpp std_msgs std_srvs visualization_msgs)
+find_package(catkin REQUIRED
+    COMPONENTS
+      actionlib
+      actionlib_msgs
+      cob_srvs
+      diagnostic_msgs
+      message_generation
+      roscpp
+      std_msgs
+      std_srvs
+      visualization_msgs
+)
 
 add_action_files(DIRECTORY action FILES
    Say.action
@@ -13,7 +24,12 @@ generate_messages(
 )
 
 catkin_package(
-  CATKIN_DEPENDS actionlib_msgs message_runtime
+  CATKIN_DEPENDS
+    actionlib_msgs
+    diagnostic_msgs
+    message_runtime
+    std_msgs
+    visualization_msgs
 )
 
 ### BUILD ###
